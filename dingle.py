@@ -9,6 +9,11 @@ Data: R_xx^S at Vg = +0.5 V (primary field sweep), oscillation of the pads 6-11 
 Amplitude dR = half peak-to-peak between consecutive extrema, placed at the 1/B midpoint.
 Reference resistance: R_ref = R_xx(B=0) (primary; the oscillating 2DEG has no classical MR of its own)
 and R_ref = R_bg(B) (polynomial background, systematic). Only points with dR/R_ref <= 0.5 (small-amplitude LK).
+NORMALISATION CHOICE (Nadav, 25 Nov): R_ref = R_xx(0) is used for every quoted tau_q. With mu B >> 1 the
+oscillation of rho_xx is proportional to the zero-field resistivity of the oscillating 2DEG (a constant), not
+to the B-dependent background. Normalising by R_bg(B) instead roughly DOUBLES tau_q (row 3 of
+dingle_results.csv, +104 %) and halves tau_tr/tau_q; this is quoted as a systematic in uncertainty_budget.csv
+and must be stated in the paper. A constant R_ref only shifts the intercept, not the slope.
 Temperature: T = 4.2 K (primary), logged T(B) (systematic), RSS profile over fixed T (degeneracy check).
 The intercept at 1/B -> 0 should be 0; a negative intercept measures the fraction of the 6-11 path
 that oscillates (ledger: two regions in series).
