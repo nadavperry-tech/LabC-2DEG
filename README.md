@@ -1,4 +1,4 @@
-# Transport in a Gated GaAs/AlGaAs Two-Dimensional Electron Gas: Hall Effect, Shubnikov–de Haas Oscillations and Gate-Induced Density Inhomogeneity
+# Quantum Hall Effect in a Partially Gated GaAs/AlGaAs Two-Dimensional Electron Gas
 
 ## Abstract
 
@@ -48,7 +48,7 @@ Known file issues (handled in `load_data.py`, listed in `tables/inventory.csv`):
 | `temperature_vs_field.py` | 0.6 | Master curve T_read(\|B\|) from all runs; tests of evenness, hysteresis, ramp vs hold and drift; low- and high-field shape fits; equivalent sensor change for a Si diode and a resistive sensor. | `data/` | `tables/thermometer_master_curve.csv`, `thermometer_all_points.csv`, `thermometer_tests.csv`, `thermometer_fits.csv`, `thermometer_sensor.csv` |
 | `rt_model.py` | 1 | Two-channel fit of the cool-down: 2DEG (impurity + Bloch–Grüneisen acoustic + LO phonons) in parallel with an activated channel in the doped AlGaAs; Arrhenius analysis of the parallel conductance. | `data/Rt-IV-11_59_06`, `hall_calibration.csv` | `tables/rt_clean.csv`, `rt_fit_params.csv`, `rt_arrhenius.csv`, `rt_values.csv`, `rt_summary.csv` |
 | `dingle.py` | 6, 2c | Dingle plot → quantum lifetime τ_q at T = 4.2 K, with the logged T(B), the background normalisation and the amplitude cut as systematics; τ_q–T degeneracy profile; upper bound on g*. | `field_symmetrized…`, `thermometer_master_curve.csv`, `sdh_results.csv` | `tables/dingle_points.csv`, `dingle_results.csv`, `dingle_T_profile.csv`, `spin_splitting.csv` |
-| `summary.py` | 0.5, 7, 8 | B = 0 resistances without a B = 0 gate sweep, two-point mobility, geometry (N_□) estimates, summary table at Vg = 0, uncertainty budget, check of every number quoted in the analysis plan. | all tables above | `tables/b0_values.csv`, `mobility_two_point.csv`, `geometry_estimates.csv`, `summary_vg0.csv`, `uncertainty_budget.csv`, `plan_claims_check.csv` |
+| `summary.py` | 0.5, 7, 8 | B = 0 resistances without a B = 0 gate sweep; mobility, transport time and mean free path with L/W = 2; consistency checks of L/W against own estimates; μ(T) below 100 K; summary table at Vg = 0; uncertainty budget; check of every number quoted in the analysis plan. | all tables above | `tables/b0_values.csv`, `mobility_two_point.csv`, `mobility_vs_T.csv`, `geometry_estimates.csv`, `summary_vg0.csv`, `uncertainty_budget.csv`, `plan_claims_check.csv` |
 | `checks.py` | – | 22 numerical sanity checks (bookkeeping, symmetry, fan intercepts, k consistency, ν assignment, thermometer, fit quality, figure files). Exits with an error if any fails. | `tables/`, `figures/` | console |
 | `run_all.py` | – | Runs every analysis script, every figure script and the checks in order. | `data/` | everything |
 
@@ -76,5 +76,6 @@ Known file issues (handled in `load_data.py`, listed in `tables/inventory.csv`):
 
 ## Conventions
 
-- R values are lock-in readings in Ω as logged (V/I with the nominal 1 µA), resolution 5 Ω. Hall values marked "true" are divided by the calibration factor k.
-- Densities in 10¹⁵ m⁻² (= 10¹¹ cm⁻²). Geometry-dependent quantities (μ, τ_tr, ℓ) are given per unit N_□ = L/W and at the own-data estimate of N_□ (see `tables/geometry_estimates.csv`), because L/W of pads 6–11 is not known.
+- R values are in Ω as logged by the acquisition program, which converts the lock-in voltage with the excitation current I = 1.0 µA (1 V source, 1 MΩ series resistor); resolution 5 Ω. Hall values marked "true" are divided by the empirical Hall-channel scale factor k (`hall.py`).
+- Densities in 10¹⁵ m⁻² (= 10¹¹ cm⁻²). Geometry-dependent quantities (μ, ρ_xx, τ_tr, ℓ) use L/W = 2 between pads 6 and 11 (lab instructor); per-unit-L/W values are also tabulated.
+- Dingle analysis: amplitudes are normalised by R_xx(B = 0); normalising by the field-dependent background instead roughly doubles τ_q and is quoted as a systematic.
