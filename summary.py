@@ -14,11 +14,14 @@ Own-data estimates, kept as consistency checks of that value (geometry_estimates
   (1) tau_tr >= tau_q        ->  N_sq >= e^2 n R_xx tau_q / m*            (satisfied by N_sq = 2)
   (2) phonon calibration     ->  N_sq = mu_ph(77 K) e n [R(77 K) - R(4.2 K)]   (Matthiessen; gives ~15, i.e.
       the rise of R between 4 and 77 K is ~8x larger than phonon scattering of a 2DEG of constant n allows)
+      (3) as (2), but with the sample temperature allowed to differ from the thermometer reading during the
+          cool-down, T_sample = a T_read (probe moving through the vapour above the bath); a is scanned and the
+          two-channel R(T) fit (hbar omega_LO fixed) picks the best value -> rt_temperature_scale.csv
 mobility_vs_T.csv: mu(T) = N_sq/(e n R(T)) for T <= 100 K at constant n, and the mobilities that correspond
 to the fitted acoustic and LO-phonon terms of rt_model (to compare with phonon-limited literature values).
 
 Outputs: tables/geometry_estimates.csv, b0_values.csv, mobility_two_point.csv, summary_vg0.csv,
-         uncertainty_budget.csv, mobility_vs_T.csv, plan_claims_check.csv
+         uncertainty_budget.csv, mobility_vs_T.csv, rt_temperature_scale.csv, plan_claims_check.csv
 """
 import numpy as np
 import pandas as pd
@@ -26,7 +29,7 @@ import pandas as pd
 from dingle import load_tau_q
 from hall import load_k
 from load_data import load
-from params import I_EXC_NOMINAL, LOCKIN_PHASE_DEG, MU_PH, M_STAR, N_SQ, e, hbar, tab_path
+from params import HBAR_OMEGA_LO_meV, I_EXC_NOMINAL, LOCKIN_PHASE_DEG, MU_PH, M_STAR, N_SQ, e, hbar, kB, tab_path
 
 
 def get(table, col, row_filter=None, value="value"):
@@ -96,6 +99,17 @@ def geometry(d, tau_q, R0):
     sN = Nsq * np.sqrt((smu / mu) ** 2 + (sn / n) ** 2 + (5.0 / dR) ** 2)
     Nmin = e**2 * n * R0 * tau_q / M_STAR
     mu77_data = N_SQ / (e * n * R77)                       # what L/W = 2 implies for the 77 K mobility
+    sc = thermometer_scale_scan(R0, n)
+    best = sc.loc[sc["chi2"].idxmin()]
+    a_best = best["a"]
+    if 0 < sc["chi2"].idxmin() < len(sc) - 1:              # parabolic refinement of the chi2 minimum
+        i = sc["chi2"].idxmin()
+        x, y = sc["a"].iloc[i - 1:i + 2].to_numpy(), sc["chi2"].iloc[i - 1:i + 2].to_numpy()
+        c = np.polyfit(x, y, 2)
+        a_best = -c[1] / (2 * c[0])
+    N_a = np.interp(a_best, sc["a"], sc["N_sq_phonon"])
+    R77a = np.interp(a_best, sc["a"], sc["R_true77_ohm"])
+    frac_ph = (1 / (e * n * mu)) * N_SQ / (R77a - R0)       # share of the rise that phonons explain at L/W = 2
     rows = [dict(method="TA value (used)", N_sq=N_SQ, s_N_sq=np.nan, note="L/W of pads 6-11, no uncertainty given"),
             dict(method="check: lower bound tau_tr >= tau_q", N_sq=Nmin, s_N_sq=np.nan,
                  note=f"N_sq >= value -> consistent with {N_SQ:g}"),
@@ -103,10 +117,36 @@ def geometry(d, tau_q, R0):
                  note=f"{Nsq/N_SQ:.1f} x the TA value -> NOT consistent. mu_ph={mu} +- {smu} m^2/Vs (literature); "
                       f"L/W = 2 implies mu(77 K) = {mu77_data*1e4:.3g} cm^2/Vs at constant n, vs ~2e5 phonon-limited. "
                       f"R(77K)={R77:.0f} Ohm, R0={R0:.0f} Ohm, parallel-channel share at 77 K = "
-                      f"{rv.loc[77.0, 'par_fraction_of_current']:.1e}")]
+                      f"{rv.loc[77.0, 'par_fraction_of_current']:.1e}"),
+            dict(method=f"check: as above, sample T = a T_read during cool-down, best a = {a_best:.2f}", N_sq=N_a, s_N_sq=N_a * smu / mu,
+                 note=f"R at true 77 K = {R77a:.0f} Ohm; still {N_a/N_SQ:.1f} x the TA value: at L/W = 2 phonons explain only "
+                      f"{100*frac_ph:.0f} % of the 4 -> 77 K rise (rest: T-dependent n or impurity scattering?); "
+                      f"chi2 profile in rt_temperature_scale.csv")]
     g = pd.DataFrame(rows)
     g.to_csv(tab_path("geometry_estimates.csv"), index=False, float_format="%.4g")
     return g, Nsq, sN
+
+
+def thermometer_scale_scan(R0, n, grid=np.round(np.arange(1.0, 1.42, 0.04), 2)):
+    """Cool-down with the sample warmer (or colder) than the thermometer: T_sample = a T_read. For each a the
+    two-channel model of rt_model is refitted with hbar omega_LO fixed at the GaAs value; chi2(a) shows which
+    scale the data prefer. The phonon calibration of N_sq is then redone at the true 77 K (T_read = 77/a)."""
+    from rt_model import fit, model_parts, t_bg
+    d = pd.read_csv(tab_path("rt_clean.csv"))
+    T, R = d["T"].to_numpy(), d["R"].to_numpy()
+    o = np.argsort(T)
+    TBG, TLO = t_bg(n), HBAR_OMEGA_LO_meV * 1e-3 * e / kB
+    mu, smu = MU_PH[77.0]
+    rows = []
+    for a in grid:
+        p, sp, chi2, dof = fit(a * T, R, TBG, TLO)
+        Rm = model_parts(a * T, p, TBG, TLO)[4]
+        R77 = np.interp(77.0 / a, T[o], R[o])
+        rows.append(dict(a=a, chi2=chi2, dof=dof, rms_resid_pct=100 * np.sqrt(np.mean((Rm / R - 1) ** 2)),
+                         R_true77_ohm=R77, N_sq_phonon=mu * e * n * (R77 - R0)))
+    t = pd.DataFrame(rows)
+    t.to_csv(tab_path("rt_temperature_scale.csv"), index=False, float_format="%.5g")
+    return t
 
 
 def mobility_vs_T(n):
