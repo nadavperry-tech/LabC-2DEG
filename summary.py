@@ -9,13 +9,16 @@ Density at Vg = 0 (ledger ruling): three determinations are reported --
 Derived quantities use n_xx (smallest error); the spread of the three is a systematic.
 
   mu = N_sq / (e n R_xx),  tau_tr = m* mu / e,  l = hbar k_F mu / e,  k_F = sqrt(2 pi n),  E_F = pi hbar^2 n / m*
-N_sq estimates (no value assumed):
-  (1) tau_tr >= tau_q        ->  N_sq >= e^2 n R_xx tau_q / m*
-  (2) phonon calibration     ->  N_sq = mu_ph(77 K) e n [R(77 K) - R(4.2 K)]   (Matthiessen; parallel channel
-                                  negligible at 77 K according to rt_model)
+N_sq = L/W of pads 6-11 = 2 (TA, params.N_SQ) is used for all geometry-dependent quantities.
+Own-data estimates, kept as consistency checks of that value (geometry_estimates.csv):
+  (1) tau_tr >= tau_q        ->  N_sq >= e^2 n R_xx tau_q / m*            (satisfied by N_sq = 2)
+  (2) phonon calibration     ->  N_sq = mu_ph(77 K) e n [R(77 K) - R(4.2 K)]   (Matthiessen; gives ~15, i.e.
+      the rise of R between 4 and 77 K is ~8x larger than phonon scattering of a 2DEG of constant n allows)
+mobility_vs_T.csv: mu(T) = N_sq/(e n R(T)) for T <= 100 K at constant n, and the mobilities that correspond
+to the fitted acoustic and LO-phonon terms of rt_model (to compare with phonon-limited literature values).
 
 Outputs: tables/geometry_estimates.csv, b0_values.csv, mobility_two_point.csv, summary_vg0.csv,
-         uncertainty_budget.csv
+         uncertainty_budget.csv, mobility_vs_T.csv, plan_claims_check.csv
 """
 import numpy as np
 import pandas as pd
@@ -23,7 +26,7 @@ import pandas as pd
 from dingle import load_tau_q
 from hall import load_k
 from load_data import load
-from params import LOCKIN_PHASE_DEG, MU_PH, M_STAR, e, hbar, tab_path
+from params import I_EXC_NOMINAL, LOCKIN_PHASE_DEG, MU_PH, M_STAR, N_SQ, e, hbar, tab_path
 
 
 def get(table, col, row_filter=None, value="value"):
@@ -92,13 +95,31 @@ def geometry(d, tau_q, R0):
     Nsq = mu * e * n * dR
     sN = Nsq * np.sqrt((smu / mu) ** 2 + (sn / n) ** 2 + (5.0 / dR) ** 2)
     Nmin = e**2 * n * R0 * tau_q / M_STAR
-    rows = [dict(method="lower bound tau_tr >= tau_q", N_sq=Nmin, s_N_sq=np.nan, note="N_sq >= value"),
-            dict(method="phonon calibration at 77 K (Matthiessen)", N_sq=Nsq, s_N_sq=sN,
-                 note=f"mu_ph={mu} +- {smu} m^2/Vs (literature, see params.py); R(77K)={R77:.0f} Ohm, R0={R0:.0f} Ohm, "
-                      f"parallel-channel share at 77 K = {rv.loc[77.0, 'par_fraction_of_current']:.1e}")]
+    mu77_data = N_SQ / (e * n * R77)                       # what L/W = 2 implies for the 77 K mobility
+    rows = [dict(method="TA value (used)", N_sq=N_SQ, s_N_sq=np.nan, note="L/W of pads 6-11, no uncertainty given"),
+            dict(method="check: lower bound tau_tr >= tau_q", N_sq=Nmin, s_N_sq=np.nan,
+                 note=f"N_sq >= value -> consistent with {N_SQ:g}"),
+            dict(method="check: phonon calibration at 77 K (Matthiessen)", N_sq=Nsq, s_N_sq=sN,
+                 note=f"{Nsq/N_SQ:.1f} x the TA value -> NOT consistent. mu_ph={mu} +- {smu} m^2/Vs (literature); "
+                      f"L/W = 2 implies mu(77 K) = {mu77_data*1e4:.3g} cm^2/Vs at constant n, vs ~2e5 phonon-limited. "
+                      f"R(77K)={R77:.0f} Ohm, R0={R0:.0f} Ohm, parallel-channel share at 77 K = "
+                      f"{rv.loc[77.0, 'par_fraction_of_current']:.1e}")]
     g = pd.DataFrame(rows)
     g.to_csv(tab_path("geometry_estimates.csv"), index=False, float_format="%.4g")
     return g, Nsq, sN
+
+
+def mobility_vs_T(n):
+    """mu(T) for N_sq = 2 at constant n (assumption: n of the 2DEG does not change below 100 K), and the
+    mobilities equivalent to the fitted acoustic (Bloch-Grueneisen) and LO-phonon terms of rt_model."""
+    rv = pd.read_csv(tab_path("rt_values.csv"))
+    rv = rv[rv["T"] <= 100.0]
+    to_mu = lambda R: N_SQ / (e * n * R) * 1e4            # cm^2/Vs
+    t = pd.DataFrame(dict(T_K=rv["T"], R_ohm=rv["R_data"], R_sq_ohm=rv["R_data"] / N_SQ,
+                          mu_cm2Vs=to_mu(rv["R_data"]),
+                          mu_ac_fit_cm2Vs=to_mu(rv["R_ac"]), mu_LO_fit_cm2Vs=to_mu(rv["R_LO"])))
+    t.to_csv(tab_path("mobility_vs_T.csv"), index=False, float_format="%.4g")
+    return t
 
 
 def per_nsq(n, R):
@@ -114,7 +135,9 @@ def run():
     b0 = b0_values()
     R0 = b0.iloc[0]["R_ohm"]
     sR0 = np.hypot(b0.iloc[0]["s_R_ohm"], b0.iloc[1]["R_ohm"] - R0)    # end-of-cool-down drop as systematic
-    g, Nsq, sN = geometry(d, tau_q, R0)
+    g, Nsq_ph, sN_ph = geometry(d, tau_q, R0)
+    Nsq, sN = N_SQ, 0.0                                    # TA value; no uncertainty given
+    mobility_vs_T(d["n0_best"])
 
     # ---- two-point mobility (section 7)
     R05 = b0[b0["Vg"] == 0.5]["R_ohm"].mean()
@@ -126,8 +149,8 @@ def run():
              "path 6-11 is inhomogeneous at +0.5 V (gated n_QH + ungated n_xx in series): effective value only")):
         q = per_nsq(n, R)
         mrows.append(dict(state=lab, n_1e15=n / 1e15, s_n_1e15=sn / 1e15, R_xx_ohm=R, s_R_ohm=sR,
-                          mu_per_Nsq_m2Vs=q["mu"], mu_per_Nsq_cm2Vs=q["mu"] * 1e4, mu_at_Nsq_est_cm2Vs=q["mu"] * 1e4 * Nsq,
-                          s_mu_at_Nsq_est_cm2Vs=q["mu"] * 1e4 * Nsq * np.sqrt((sN / Nsq) ** 2 + (sn / n) ** 2 + (sR / R) ** 2),
+                          mu_per_Nsq_m2Vs=q["mu"], mu_per_Nsq_cm2Vs=q["mu"] * 1e4, mu_at_Nsq2_cm2Vs=q["mu"] * 1e4 * Nsq,
+                          s_mu_at_Nsq2_cm2Vs=q["mu"] * 1e4 * Nsq * np.sqrt((sN / Nsq) ** 2 + (sn / n) ** 2 + (sR / R) ** 2),
                           note=note))
     mob = pd.DataFrame(mrows)
     mob.to_csv(tab_path("mobility_two_point.csv"), index=False, float_format="%.5g")
@@ -153,24 +176,32 @@ def run():
         ("n used (best), syst = spread of the three", n / 1e15, sn / 1e15, "1e15 m^-2", ""),
         ("R_xx(B=0, Vg=0)", R0, sR0, "Ohm", "cool-down end; as read"),
         ("mu x (1/N_sq)", q["mu"], q["mu"] * rel(sn / n, sR0 / R0), "m^2/Vs", "mu = N_sq x value"),
-        ("mu at N_sq estimate", q["mu"] * Nsq * 1e4, q["mu"] * Nsq * 1e4 * rel(sN / Nsq, sn / n, sR0 / R0), "cm^2/Vs", f"N_sq = {Nsq:.1f}"),
+        ("mu at L/W = 2 (TA)", q["mu"] * Nsq * 1e4, q["mu"] * Nsq * 1e4 * rel(sn / n, sR0 / R0), "cm^2/Vs",
+         f"x k = {d['k']:.3f} if the R_xx channel shares the Hall scale factor"),
+        ("rho_xx = R_xx w/L (Vg=0)", R0 / Nsq, sR0 / Nsq, "Ohm/sq", ""),
+        ("mu_q = e tau_q / m* (quantum mobility)", e * tau_q / M_STAR * 1e4, e * s_tau_q / M_STAR * 1e4, "cm^2/Vs", ""),
         ("tau_tr x (1/N_sq)", q["tau_tr"] * 1e12, q["tau_tr"] * 1e12 * rel(sn / n, sR0 / R0), "ps", ""),
-        ("tau_tr at N_sq estimate", q["tau_tr"] * Nsq * 1e12, q["tau_tr"] * Nsq * 1e12 * rel(sN / Nsq, sn / n), "ps", ""),
+        ("tau_tr at L/W = 2", q["tau_tr"] * Nsq * 1e12, q["tau_tr"] * Nsq * 1e12 * rel(sn / n, sR0 / R0), "ps", ""),
         ("tau_q (Dingle, T = 4.2 K)", tau_q * 1e12, s_tau_q * 1e12, "ps", "ungated region, same n as Vg=0"),
         ("tau_tr/tau_q x (1/N_sq)", q["tau_tr"] / tau_q, q["tau_tr"] / tau_q * rel(s_tau_q / tau_q, sn / n), "", ""),
-        ("tau_tr/tau_q at N_sq estimate", q["tau_tr"] * Nsq / tau_q, q["tau_tr"] * Nsq / tau_q * rel(sN / Nsq, s_tau_q / tau_q), "", ""),
+        ("tau_tr/tau_q at L/W = 2", q["tau_tr"] * Nsq / tau_q, q["tau_tr"] * Nsq / tau_q * rel(sn / n, sR0 / R0, s_tau_q / tau_q), "",
+         "R_bg(B) Dingle normalisation would halve this"),
         ("E_F", EF / e * 1e3, EF / e * 1e3 * sn / n, "meV", ""),
         ("k_F", kF / 1e8, kF / 1e8 * sn / (2 * n), "1e8 m^-1", ""),
         ("l_mfp x (1/N_sq)", q["l"] * 1e6, q["l"] * 1e6 * rel(sn / (2 * n), sR0 / R0), "um", ""),
-        ("l_mfp at N_sq estimate", q["l"] * Nsq * 1e6, q["l"] * Nsq * 1e6 * rel(sN / Nsq, sn / (2 * n)), "um", ""),
+        ("l_mfp at L/W = 2", q["l"] * Nsq * 1e6, q["l"] * Nsq * 1e6 * rel(sn / (2 * n), sR0 / R0), "um", ""),
+        ("k_F l_mfp at L/W = 2 (>> 1: weak disorder)", kF * q["l"] * Nsq, kF * q["l"] * Nsq * rel(sn / n, sR0 / R0), "", ""),
+        ("B where mu B = 1 (classical MR / Hall-angle scale)", 1 / (q["mu"] * Nsq), 1 / (q["mu"] * Nsq) * rel(sn / n, sR0 / R0), "T", ""),
+        ("B where omega_c tau_q = 1 (SdH onset scale)", M_STAR / (e * tau_q), M_STAR / (e * tau_q) * s_tau_q / tau_q, "T", ""),
         ("C (Hall n(Vg), 0.5 T)", ch["C_uF_per_cm2"], ch["sC"] * 1e2, "uF/cm^2", "linear fit -0.5..0.5 V"),
         ("C (SdH minima fan)", cs["C_uF_per_cm2"], cs["sC"] * 1e2, "uF/cm^2", ""),
         ("d_eff = eps0 eps_r / C (Hall)", ch["d_eff_nm"], ch["s_d_eff_nm"], "nm", "eps_r = 12.9"),
         ("d_geom = d_eff - <z> - eps/C_q (Hall)", ch["d_geom_nm"], ch["s_d_eff_nm"], "nm", f"<z>={ch['z_avg_nm']:.1f} nm, eps/C_q={ch['eps_over_Cq_nm']:.1f} nm"),
         ("V_th (Hall linear fit)", ch["V_th"], np.nan, "V", ""),
         ("alpha (odd admixture in 6-11)", a_field["alpha_mean"], a_field["alpha_std"], "", f"gate sweeps {a_gate.min():.3f}-{a_gate.max():.3f}"),
-        ("N_sq lower bound (tau_tr >= tau_q)", g.iloc[0]["N_sq"], np.nan, "", ""),
-        ("N_sq phonon calibration (77 K)", Nsq, sN, "", "mu_ph(77 K) literature"),
+        ("N_sq = L/W (TA)", Nsq, np.nan, "", "used"),
+        ("N_sq lower bound (tau_tr >= tau_q)", g.iloc[1]["N_sq"], np.nan, "", "consistent"),
+        ("N_sq phonon calibration (77 K), check only", Nsq_ph, sN_ph, "", "inconsistent with TA value (see geometry_estimates.csv)"),
     ]
     summ = pd.DataFrame(rows, columns=["quantity", "value", "uncertainty", "unit", "note"])
     summ.to_csv(tab_path("summary_vg0.csv"), index=False, float_format="%.5g")
@@ -189,7 +220,8 @@ def run():
         ("density drift early vs late (gate cycling)", "sys", "n_H, n_QH at +0.5 V", f"n_H {100*(hd.iloc[1]['n_H_1e15']-nH5)/nH5:+.1f} %", "S_up - S_down"),
         ("Hall-channel scale k", "sys", "all Hall densities, plateau values", f"k = {d['k']:.4f} +- {d['sk']:.4f} ({100*d['sk']/d['k']:.1f} %)", "n_QH/n_H; plateau readings 0.8033(5)"),
         ("lock-in phase 24 deg", "sys", "k (hypothesis)", f"cos24 = {np.cos(np.radians(LOCKIN_PHASE_DEG)):.3f}: excluded as sole cause ({(d['k']-np.cos(np.radians(24)))/d['sk']:.0f} sigma)", "hall_calibration.csv"),
-        ("excitation current (nominal 1 uA)", "sys", "R_xx, mu, tau_tr, l (if k is a current error: x 1/k)", f"{100*(1/d['k']-1):.0f} %", "open question to TA"),
+        ("excitation current", "-", "all R", f"I = {I_EXC_NOMINAL*1e6:.1f} uA confirmed (1 V, 1 MOhm; program logs R = V/I)", "TA, 25 Nov -> k is not a current error"),
+        ("R_xx channel scale (does it share k?)", "sys", "R_xx, rho_xx, mu, tau_tr, l_mfp", f"if yes: R_xx x {1/d['k']:.2f}, mu x {d['k']:.2f} ({100*(d['k']-1):.0f} %)", "unknown; no internal calibration of channel No.1"),
         ("lock-in lag", "sys", "Vg of gate features; B of field features",
          f"tau_eff = {hy.iloc[0]['tau_eff_s']:.1f} +- {hy.iloc[0]['s_tau_eff_s']:.1f} s; {hy.iloc[0]['dVg_mV']/2:.0f} mV per sweep; dB = tau*dB/dt ~ 6 mT", "SdH minima up vs down; cancelled by averaging / same-direction symmetrisation"),
         ("admixture alpha", "sys", "R_xx, R_xy before symmetrisation", f"alpha = {a_field['alpha_mean']:.3f} +- {a_field['alpha_std']:.3f} (field), {a_gate.min():.3f}-{a_gate.max():.3f} (gate)", "removed exactly by Onsager symmetrisation"),
@@ -198,14 +230,14 @@ def run():
         ("eps_r (GaAs 12.9 vs AlGaAs 12.2)", "sys", "d_eff", f"{100*(1-12.2/12.9):.1f} %", ""),
         ("density at Vg=0: method spread", "sys", "n0 and all derived", f"{100*d['s_n0_sys']/d['n0_best']:.1f} %", "k n_H(0), n_SdH(0), n_xx"),
         ("temperature for Dingle (4.2 K vs logged)", "sys", "tau_q", f"{100*(dres.iloc[1]['tau_q_ps']-dres.iloc[0]['tau_q_ps'])/dres.iloc[0]['tau_q_ps']:+.0f} %", "dingle_results.csv; T itself not fixable (dingle_T_profile.csv)"),
-        ("Dingle normalisation R(0) vs R_bg(B)", "sys", "tau_q", f"{100*(dres.iloc[2]['tau_q_ps']-dres.iloc[0]['tau_q_ps'])/dres.iloc[0]['tau_q_ps']:+.0f} %", "large positive MR background"),
+        ("Dingle normalisation R(0) (used) vs R_bg(B)", "sys", "tau_q, tau_tr/tau_q, Gamma", f"{100*(dres.iloc[2]['tau_q_ps']-dres.iloc[0]['tau_q_ps'])/dres.iloc[0]['tau_q_ps']:+.0f} % (tau_q {dres.iloc[2]['tau_q_ps']:.2f} vs {dres.iloc[0]['tau_q_ps']:.2f} ps)", "R(0) chosen (Nadav, 25 Nov); R_bg(B) quoted as systematic"),
         ("Dingle small-amplitude cut", "sys", "tau_q", f"{100*(dres.iloc[3]['tau_q_ps']-dres.iloc[0]['tau_q_ps'])/dres.iloc[0]['tau_q_ps']:+.0f} %", "all points vs dR/R0 <= 0.5"),
-        ("N_sq (unknown geometry)", "sys", "mu, tau_tr, l_mfp, tau_tr/tau_q", f"estimate {Nsq:.1f} +- {sN:.1f} ({100*sN/Nsq:.0f} %)", "mu_ph(77 K) literature dominates"),
+        ("L/W = 2 (TA)", "sys", "mu, tau_tr, l_mfp, tau_tr/tau_q (all proportional to L/W)", "no uncertainty given by TA", "own phonon estimate 15 +- 5 disagrees (geometry_estimates.csv)"),
         ("R_xx(0) end-of-cool-down drop", "sys", "R0, mu", f"{sR0:.0f} Ohm", "839 (T<4.3 K) vs 857 (T<13 K)"),
     ]
     bud = pd.DataFrame(budget, columns=["source", "type", "affects", "magnitude", "how estimated"])
     bud.to_csv(tab_path("uncertainty_budget.csv"), index=False)
-    plan_claims(d, b0, R0, Nsq, sN)
+    plan_claims(d, b0, R0, Nsq_ph, sN_ph)
     return d, b0, g, mob, summ, bud
 
 
@@ -240,7 +272,7 @@ def plan_claims(d, b0, R0, Nsq, sN):
         ("2b", "k ~ cos 24 deg", f"k = {d['k']:.3f} +- {d['sk']:.3f}; cos 24 = 0.914", "NOT confirmed"),
         ("2b", "single n_SdH", f"two: n_xx = {d['nxx']/1e15:.3f} (pads 6-11), n_QH = {d['nQH5']/1e15:.3f} (pads 6-3) 1e15 m^-2 at +0.5 V", "corrected"),
         ("3", "hysteresis ~ 25 mV from lock-in lag", f"{hy['dVg_mV']:.0f} +- {hy['s_dVg_mV']:.0f} mV (tau_eff {hy['tau_eff_s']:.1f} s) + anomalous loop at Vg 0..0.15 V", "confirmed + anomaly"),
-        ("0.5", "N_sq ~ 15-20 (back-of-envelope)", f"{Nsq:.1f} +- {sN:.1f}", "consistent"),
+        ("0.5", "N_sq ~ 15-20 (back-of-envelope)", f"own phonon estimate {Nsq:.1f} +- {sN:.1f}; TA: L/W = {N_SQ:g}", "contradicted by TA value"),
     ]
     pd.DataFrame(rows, columns=["plan_section", "plan_statement", "measured", "verdict"]).to_csv(
         tab_path("plan_claims_check.csv"), index=False)
