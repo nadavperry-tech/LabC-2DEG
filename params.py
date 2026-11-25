@@ -40,27 +40,40 @@ GS, GV = 2, 1                       # spin and valley degeneracy
 # ---------------------------------------------------------------- experimental settings (lab notebook / plan section 0.3)
 T_BATH = 4.2                        # K. LHe at ambient pressure, bath not pumped (plan section 0.6)
 R_RESOLUTION = 5.0                  # Ohm, digitisation step of the logged lock-in readings
-I_EXC_NOMINAL = 1e-6                # A, AC source 1 V through 1 MOhm (inferred; TA asked to confirm)
+V_SOURCE = 1.0                      # V, AC source amplitude (TA, 25 Nov)
+R_SERIES = 1e6                      # Ohm, series resistor (TA, 25 Nov: 1 MOhm, not 1 kOhm)
+I_EXC_NOMINAL = V_SOURCE / R_SERIES # A = 1.0 uA (confirmed by TA). The acquisition program was given R_SERIES and the
+                                    # source value and logs R = V_lock-in / I directly, so the data columns are in Ohm
+                                    # with I = 1 uA already applied; no further conversion is done in this code.
+                                    # Consequence: the Hall scale factor k (hall.py) is NOT an excitation-current error.
 LOCKIN_PHASE_DEG = 24.0             # reference phase set on both SR510
 LOCKIN_DELAY_S = 2.0                # mean delay of pre 1 s + post 1 s filters (plan 0.3)
 LOCKIN_SETTLE_99_S = 6.6            # time to 99 % for the same filter chain
 F_REF_HZ = 11.45
 
 # ---------------------------------------------------------------- geometry
-# N_sq = L/W between the voltage pads 6-11 is NOT known (TA asked).  Geometry-dependent
-# quantities are reported per unit N_sq and, for orientation only, at the own-data estimate
-# written by summary.py to tables/geometry_estimates.csv.
-N_SQ_KNOWN = None
+# N_sq = L/W between the longitudinal voltage pads 6-11: L/W = 2 (TA, 25 Nov; no uncertainty given).
+# Sample layout (Nadav, 25 Nov; lab instructions Fig. 1): the gate (pad 1) covers only part of the bar;
+# pad 11 sits across the bar from the gate contact, pads 6 and 3 (Hall pair) sit next to them.
+# Distance gate -> 2DEG: not known (TA) -> only the measured d_eff = eps0 eps_r / C is reported.
+N_SQ = 2.0
+GATE_DEPTH_NOMINAL = None
 
-# Phonon-limited mobility used for the N_sq calibration of plan section 0.5 (method 2), applied
-# through Matthiessen's rule to the *phonon part* of the 2DEG resistance, R_2D(77 K) - R_0.
+# Thermometer: Lake Shore 331 controller (Nadav, 25 Nov); sensor per lab instructions: Cernox.
+# Our field error (-25 % at 5.45 T, 4.2 K) is ~100x the typical Cernox CX-1050 error (+0.1 % at 2.5 T,
+# -0.15 % at 8 T) and close to the typical Si-diode error with junction perpendicular to B
+# (-8 % at 1 T ... -20 % at 5 T) -- Lake Shore sensor data, used here for orientation only (not citable).
+
+# Phonon-limited mobility, now used only as a CONSISTENCY CHECK of N_sq (summary.py, geometry_estimates.csv):
+# own estimate N_sq = mu_ph e n [R(77 K) - R0] (Matthiessen applied to R_2D(77 K) - R_0) vs the TA value.
 #   * bulk GaAs lattice-limited mobility at 77 K: 2.4e5 cm^2/Vs
 #     (Stillman, Wolfe & Dimmock, J. Appl. Phys. 41, 3088 (1970));
 #   * calculations for the 2DEG give ~25 % lower values at n ~ 7e11 cm^-2
 #     (Phonon-limited mobility in GaAlAs/GaAs heterostructures, Appl. Phys. Lett. 45, 581 (1984));
-#   * the cleanest 2DEGs reach ~4e5 cm^2/Vs at 77 K (upper bound).
+#   * measured 2DEG maximum at 77 K ~2e5 cm^2/Vs, limited by optical phonons
+#     (Mendez, Price & Heiblum, Appl. Phys. Lett. 45, 294 (1984)).
 # Central value 2.0e5 cm^2/Vs with a +-0.6e5 systematic covers this spread.
-# (Hirakawa & Sakaki 1986, named in the plan, could not be checked here -> verify if cited.)
+# (Hirakawa & Sakaki, Phys. Rev. B 33, 8291 (1986), named in the plan, not read here: paywalled.)
 MU_PH = {77.0: (20.0, 6.0)}         # T [K] : (mu_ph [m^2/Vs], 1-sigma systematic)
 
 # ---------------------------------------------------------------- analysis choices (see ledger/rulings.md)
