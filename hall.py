@@ -7,6 +7,12 @@ hall.py -- plan section 2a/2b: Hall density, plateau table, calibration factor k
           Hall reading scale drifted by ~1 % while n_QH stayed constant to 0.2 % (ledger ruling)
   true R_xy = R_xy(read)/k ;  true n from the Hall slope = k * n_H
 
+Origin of k: the excitation is confirmed as 1.0 uA (TA, 25 Nov: 1 V through 1 MOhm; the acquisition program
+logs R = V/I), so k is not a current error. k is the same from the classical regime (0.15-1 T slope) to the
+quantum Hall plateaus (nu = 6-12). Geometric shorting of the Hall voltage depends on the Hall angle and
+disappears on a plateau, so it cannot give a constant k; k is treated as an empirical scale factor of the
+Hall readout chain whose origin is open. Whether channel No.1 (R_xx) shares it is unknown (summary.py).
+
 Vg = 0 density comes from the stepped gate sweeps at |B| = 0.5 T (and 1.5 T as a check),
 averaging the down and up sweeps (lock-in lag cancels, plan section 3).
 
@@ -94,7 +100,9 @@ def run():
     pl["Rxy_true"] = pl["Rxy_read"] / k
     pl["dev_from_RK_over_nu_pct"] = 100 * (pl["Rxy_true"] / pl["R_K_over_nu"] - 1)
     pl["B_nu_expected"] = n_qh * h / (pl["nu"] * e)
-    # sigma_xy in e^2/h: rho_xx/rho_xy < 0.1 for any N_sq > 3 -> sigma_xy = 1/rho_xy to < 1 %
+    # sigma_xy in e^2/h = R_K/R_xy(true). This assumes rho_xx << rho_xy in the Hall-cross (gated) region on
+    # its plateaus. The R_xx we measure (pads 6-11, L/W = 2) is dominated by the ungated region, which is
+    # NOT on a plateau at these fields, so it cannot be used for the tensor inversion of the gated region.
     Rxx_at = np.interp(pl["B_plateau"], fs["absB"], fs["Rxx_S"])
     pl["Rxx_S_read_at_plateau"] = Rxx_at
     pl["sigma_xy_e2h_approx"] = R_K / pl["Rxy_true"]
@@ -113,8 +121,8 @@ def run():
              value=xx["n_fan_1e15"] * 1e15 / n0, sigma=np.nan),
         dict(quantity="cos(24 deg) (phase-offset hypothesis)", value=cos_phase, sigma=np.nan),
         dict(quantity="(k - cos24)/sigma_k", value=(k - cos_phase) / sk, sigma=np.nan),
-        dict(quantity="implied excitation current I = k * 1 uA [uA] (if the whole factor is the current)",
-             value=k, sigma=sk),
+        dict(quantity="excitation current confirmed by TA [uA] (so k is not a current error)",
+             value=1.0, sigma=np.nan),
         dict(quantity="implied extra phase if k = cos(phi) [deg]", value=np.degrees(np.arccos(min(k, 1))), sigma=np.nan),
         dict(quantity="n_QH [1e15 m^-2]", value=n_qh / 1e15, sigma=sn_qh / 1e15),
         dict(quantity="n_H(+0.5 V) [1e15 m^-2]", value=n0 / 1e15, sigma=sn_h / 1e15),
