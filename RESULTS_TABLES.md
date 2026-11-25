@@ -428,6 +428,23 @@ Per-run rms residual from the master curve: median 3.5 mK, max 22.1 mK (Rt-IV-11
 | 100 | 3100 | 1550 | 8429 | 3.593e+04 | 1.746e+04 |
 
 
+## rt_temperature_scale.csv
+
+| a | chi2 | dof | rms_resid_pct | R_true77_ohm | N_sq_phonon |
+|---|---|---|---|---|---|
+| 1 | 7095.4 | 1277 | 2.3574 | 1843.2 | 15.369 |
+| 1.04 | 5273 | 1277 | 2.0288 | 1734.4 | 13.702 |
+| 1.08 | 3971.7 | 1277 | 1.7565 | 1650 | 12.411 |
+| 1.12 | 3144.3 | 1277 | 1.5584 | 1569.9 | 11.184 |
+| 1.16 | 2747.2 | 1277 | 1.4529 | 1494.6 | 10.032 |
+| 1.2 | 2740.8 | 1277 | 1.4495 | 1446.3 | 9.2927 |
+| 1.24 | 3088.2 | 1277 | 1.5394 | 1404.3 | 8.6501 |
+| 1.28 | 3755.9 | 1277 | 1.7002 | 1375.9 | 8.2149 |
+| 1.32 | 4713.3 | 1277 | 1.9078 | 1335 | 7.5892 |
+| 1.36 | 5932.3 | 1277 | 2.1435 | 1307.2 | 7.1639 |
+| 1.4 | 7387.2 | 1277 | 2.3949 | 1269.9 | 6.5933 |
+
+
 ## geometry_estimates.csv
 
 | method | N_sq | s_N_sq | note |
@@ -435,4 +452,4 @@ Per-run rms residual from the master curve: median 3.5 mK, max 22.1 mK (Rt-IV-11
 | TA value (used) | 2 |  | L/W of pads 6-11, no uncertainty given |
 | check: lower bound tau_tr >= tau_q | 0.6541 |  | N_sq >= value -> consistent with 2 |
 | check: phonon calibration at 77 K (Matthiessen) | 15.37 | 4.647 | 7.7 x the TA value -> NOT consistent. mu_ph=20.0 +- 6.0 m^2/Vs (literature); L/W = 2 implies mu(77 K) = 1.42e+04 cm^2/Vs at constant n, vs ~2e5 phonon-limited. R(77K)=1843 Ohm, R0=839 Ohm, parallel-channel share at 77 K = 7.9e-08 |
-
+| check: as above, sample T = a T_read during cool-down, best a = 1.18 | 9.649 | 2.895 | R at true 77 K = 1470 Ohm; still 4.8 x the TA value: at L/W = 2 phonons explain only 21 % of the 4 -> 77 K rise (rest: T-dependent n or impurity scattering?); chi2 profile in rt_temperature_scale.csv |
