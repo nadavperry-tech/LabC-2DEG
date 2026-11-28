@@ -88,19 +88,19 @@ box(RX0, 2.40, RX1, 2.80, "Magnet supply\n(Oxford PS120)")
 box(RX0, 1.74, RX1, 2.10, "SourceMeter\n(Keithley 2400)")
 box(RX0, 1.24, RX1, 1.60, "Lake Shore 331")
 box(0.05, 0.98, 0.64, 1.78, "Lock-in 1\n(SR510)\n\n$V_{xx}$:\npads\n6, 11")
-box(0.95, 0.10, 2.30, 0.42, "Lock-in 2 (SR510)    $V_{xy}$: pads 6, 3")
+box(0.95, 0.06, 2.30, 0.44, "Lock-in 2 (SR510)\n$V_{xy}$: pads 6, 3")
 
 # lock-in 1: pads 11 and 6 (left)
 wire((P["11"][0] - 0.075, P["11"][1]), (0.64, P["11"][1]))
 wire((P["6"][0] - 0.075, P["6"][1]), (0.64, P["6"][1]))
 # lock-in 2: pads 6 and 3 (down)
-wire((P["6"][0], P["6"][1] - 0.062), (P["6"][0], 0.42))
+wire((P["6"][0], P["6"][1] - 0.062), (P["6"][0], 0.44))
 YC = 0.66                                                   # current wire, below the cryostat
 hop = 0.045
 wire((P["3"][0], P["3"][1] - 0.062), (P["3"][0], YC + hop))
 th = np.linspace(0, np.pi, 30)
 ax.plot(P["3"][0] + hop * np.sin(th), YC + hop * np.cos(th), "-", color="k", lw=WL, zorder=2)   # hop over the current wire
-wire((P["3"][0], YC - hop), (P["3"][0], 0.42))
+wire((P["3"][0], YC - hop), (P["3"][0], 0.44))
 # current: source -> 1 MOhm -> pad 5 ... pad 15 -> source
 wire((P["5"][0], P["5"][1] - 0.062), (P["5"][0], YC), (XR, YC), (XR, 0.84))
 zx = XR + 0.045 * np.array([0, 1, -1, 1, -1, 1, -1, 0])     # resistor zigzag on the riser
