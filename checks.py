@@ -65,7 +65,7 @@ n = s.loc["n used (best), syst = spread of the three", "value"] * 1e15
 check(abs(s.loc["E_F", "value"] - np.pi * (1.054571817e-34) ** 2 * n / (0.067 * 9.1093837e-31) / e * 1e3) < 0.01,
       "E_F recomputed from n matches the table")
 need = ["fig01_cooldown_RT.pdf", "fig02_symmetrisation.pdf", "fig03_thermometer_vs_field.pdf", "fig04_hall_plateaus.pdf",
-        "fig05_sdh_fft_fan.pdf", "fig06_density_vs_gate.pdf", "fig07_gate_sweeps.pdf", "fig08_colourmap_landau_fan.pdf",
+        "fig05_sdh_fft_fan.pdf", "fig06_density_vs_gate.pdf", "fig07_gate_sweeps.pdf", "fig08_landau_fan.pdf",
         "fig09_sdh_spacing_capacitance.pdf", "fig10_dingle.pdf", "figA9_exponential_fit.pdf"]
 check(all(os.path.getsize(os.path.join(FIG_DIR, f)) > 5000 for f in need if os.path.exists(os.path.join(FIG_DIR, f)))
       and all(os.path.exists(os.path.join(FIG_DIR, f)) for f in need), "all 11 figure PDFs exist and are non-trivial")

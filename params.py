@@ -46,7 +46,7 @@ I_EXC_NOMINAL = V_SOURCE / R_SERIES # A = 1.0 uA (confirmed by TA). The acquisit
                                     # source value and logs R = V_lock-in / I directly, so the data columns are in Ohm
                                     # with I = 1 uA already applied; no further conversion is done in this code.
                                     # Consequence: the Hall scale factor k (hall.py) is NOT an excitation-current error.
-LOCKIN_PHASE_DEG = 24.0             # reference phase set on both SR510
+LOCKIN_PHASE_DEG = 24.0             # reference phase shown on one SR510 (set by the TA; the other was not recorded)
 LOCKIN_DELAY_S = 2.0                # mean delay of pre 1 s + post 1 s filters (plan 0.3)
 LOCKIN_SETTLE_99_S = 6.6            # time to 99 % for the same filter chain
 F_REF_HZ = 11.45
@@ -83,20 +83,82 @@ SDH_BG_DEG = 3                      # polynomial degree of the non-oscillatory b
 VG_STEP = 0.010                     # V, gate step of the stepped sweeps
 
 # ---------------------------------------------------------------- plotting style (writing guide 4.1)
+# Figures are drawn at their final printed width, so the font sizes below are the sizes in the paper.
+# REVTeX 4.2 reprint (two columns): \columnwidth = 246 pt = 3.40 in, \textwidth = 510 pt = 7.06 in.
+# Include column figures with width=\columnwidth and figure* with width=\textwidth (scale 1.00-1.01).
+COL_W = 3.4                         # in, one column (figure)
+FULL_W = 7.0                        # in, full page width (figure*)
+
+
 def plot_style():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.rcParams.update({
-        "font.size": 11, "axes.labelsize": 12, "axes.titlesize": 12,
-        "legend.fontsize": 9, "xtick.labelsize": 10, "ytick.labelsize": 10,
-        "figure.dpi": 100, "savefig.bbox": "tight", "lines.markersize": 4,
-        "axes.grid": True, "grid.alpha": 0.3,
+        # text: 8-9 pt in print
+        "font.size": 8, "axes.labelsize": 8.5, "axes.titlesize": 8.5,
+        "legend.fontsize": 8, "xtick.labelsize": 8, "ytick.labelsize": 8,
+        # layout: constrained layout fills figsize; the tight bbox only trims the outer white margin
+        "figure.constrained_layout.use": True,
+        "figure.constrained_layout.h_pad": 0.02, "figure.constrained_layout.w_pad": 0.02,
+        "figure.constrained_layout.hspace": 0.02, "figure.constrained_layout.wspace": 0.02,
+        "savefig.bbox": "tight", "savefig.pad_inches": 0.015, "figure.dpi": 150,
+        # line and marker weights for a 3.4 in / 7.0 in figure
+        "lines.linewidth": 1.0, "lines.markersize": 3.5, "lines.markeredgewidth": 0.7,
+        "axes.linewidth": 0.6, "axes.titlepad": 3.5, "axes.labelpad": 2.5,
+        "xtick.major.width": 0.6, "ytick.major.width": 0.6, "xtick.minor.width": 0.5, "ytick.minor.width": 0.5,
+        "xtick.major.size": 3, "ytick.major.size": 3, "xtick.minor.size": 1.8, "ytick.minor.size": 1.8,
+        "xtick.major.pad": 2.5, "ytick.major.pad": 2.5,
+        "legend.borderpad": 0.3, "legend.labelspacing": 0.25, "legend.handlelength": 1.8,
+        "legend.handletextpad": 0.4, "legend.columnspacing": 0.9, "legend.borderaxespad": 0.3,
+        "legend.framealpha": 0.85,
+        "axes.grid": True, "grid.alpha": 0.3, "grid.linewidth": 0.5,
+        "errorbar.capsize": 2,
+        "pdf.fonttype": 42,          # embed TrueType fonts (text stays selectable/searchable in the PDF)
     })
     return plt
 
 MARKERS = ["o", "s", "^", "v", "D", "P", "X", "*"]
 LINESTYLES = ["-", "--", "-.", ":"]
+
+
+def panel_label(ax, letter, where=None):
+    """Panel letter for the paper's (a), (b), ... references: prefixed to the panel title, or placed inside the
+    axes (where = "upper left" / "upper right") for panels without a title."""
+    if where is None and ax.get_title():
+        ax.set_title(f"({letter}) " + ax.get_title())
+    else:
+        right = where == "upper right"
+        ax.text(0.98 if right else 0.02, 0.95, f"({letter})", transform=ax.transAxes, ha="right" if right else "left",
+                va="top", fontsize=8.5)
+
+
+# Legends outside the axes: a soft frame (thin light-grey rounded border) keeps them visually apart from the x label.
+LEGEND_BOX = dict(frameon=True, fancybox=True, edgecolor="0.72", facecolor="white", framealpha=1.0)
+
+
+def soft_frame(leg):
+    """Thin light-grey border for a legend that sits outside the axes."""
+    leg.get_frame().set_linewidth(0.5)
+    return leg
+
+
+def legend_below(ax, *args, gap=None, **kw):
+    """Legend under the axes, outside the data: centred, in a soft frame. gap = distance in inches from the bottom of
+    the axes to the top of the legend; the default clears the tick labels and the x label with some extra space (or
+    leaves a small margin when the axes has no tick labels, e.g. the upper panel of a shared-x pair). Constrained
+    layout makes room for it."""
+    import matplotlib.transforms as mt
+    if gap is None:
+        has_ticklabels = ax.xaxis.get_tick_params().get("labelbottom", True)
+        gap = (0.43 if ax.get_xlabel() else 0.26) if has_ticklabels else 0.07
+    tr = mt.offset_copy(ax.transAxes, fig=ax.get_figure(root=True), y=-gap, units="inches")
+    for k, v in LEGEND_BOX.items():
+        kw.setdefault(k, v)
+    kw.setdefault("loc", "upper center")
+    kw.setdefault("borderaxespad", 0.0)
+    kw.setdefault("labelspacing", 0.3)
+    return soft_frame(ax.legend(*args, bbox_to_anchor=(0.5, 0.0), bbox_transform=tr, **kw))
 
 
 def fig_path(name):
